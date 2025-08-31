@@ -97,7 +97,7 @@ def main(lock, counter):
     producer = Producer(PRODUCER_CONFIG)
 
     while True:     
-        time.sleep(2)  
+        #time.sleep(2)  
         record = get_record()
         
         if record is None:
