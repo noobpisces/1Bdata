@@ -44,7 +44,7 @@ def delivery_report(err, msg):
     if err is not None:
         logging.error(f"Delivery failed for User record {msg.key()}: {err}")
         return
-    logging.info(f'User record { msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
+    print(f'User record { msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}')
 
 
 def main(lock, counter):
@@ -59,26 +59,37 @@ def main(lock, counter):
     """
     topic = os.environ.get("TOPIC_NAME")
 
+    # PRODUCER_CONFIG = {
+
+    #       **get_base_config(),
+
+    #       "linger.ms": 10000,
+    #       "batch.size": 15000 * 1024, #15 KB
+    #       "batch.num.messages": 100,
+
+    #       "queue.buffering.max.kbytes": 10000 * 1024, #100 kb
+    #       "queue.buffering.max.messages": 800,
+
+    #       "retries": 3,
+    #       "enable.idempotence": True,
+    #       "max.in.flight.requests.per.connection": 5,
+    #       "retry.backoff.ms": 500,
+
+
+    #       "compression.type": "snappy"
+    #  }
     PRODUCER_CONFIG = {
-
-          **get_base_config(),
-
-          "linger.ms": 10,
-          "batch.size": 15 * 1024, #15 KB
-          "batch.num.messages": 100,
-
-          "queue.buffering.max.kbytes": 100 * 1024, #100 kb
-          "queue.buffering.max.messages": 850000,
-
-          "retries": 3,
-          "enable.idempotence": True,
-          "max.in.flight.requests.per.connection": 5,
-          "retry.backoff.ms": 500,
-
-
-          "compression.type": "snappy"
-     }
-
+    **get_base_config(),
+    "linger.ms": 5000,  # chờ tối đa 5 giây để gom batch
+    "batch.size": 64 * 1024,  # 64 KB mỗi batch
+    "compression.type": "snappy",  # nén để gửi được nhiều hơn
+    "queue.buffering.max.kbytes": 1024 * 1024,  # 1GB buffer
+    "queue.buffering.max.messages": 1000000,  # tối đa 1 triệu message trong queue
+    "retries": 3,
+    "enable.idempotence": True,
+    "max.in.flight.requests.per.connection": 5,
+    "retry.backoff.ms": 500
+}
     # setting string serializer for key (session_id)
     string_serializer = StringSerializer()
 
@@ -97,7 +108,7 @@ def main(lock, counter):
     producer = Producer(PRODUCER_CONFIG)
 
     while True:     
-        #time.sleep(2)  
+        time.sleep(3)  
         record = get_record()
         
         if record is None:
@@ -113,7 +124,6 @@ def main(lock, counter):
             logging.info("Sending to DLQ topic")
             send_to_dlq(record=record, topic=os.environ.get("TOPIC_NAME_DLQ"), producer=producer)
             continue
-
         try:
             # produce serialized record to Kafka topic with string-serialized key
             producer.produce(
